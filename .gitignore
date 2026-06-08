@@ -1,0 +1,6 @@
+.venv/
+vector_store/
+10K.pdf
+__pycache__/
+*.pkl
+.env
