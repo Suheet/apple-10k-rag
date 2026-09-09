@@ -9,7 +9,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 
 # ── CONFIGURATION ─────────────────────────────────────────────────────────────
-PDF_PATH      = os.path.join(os.path.dirname(__file__), "/Users/suheetsonawane/Desktop/India Vapsi/Github/Projects/Apple Sales RAG LLM/10K.pdf")
+PDF_PATH = os.path.join(os.path.dirname(__file__), "10K.pdf")
 STORE_DIR     = os.path.join(os.path.dirname(__file__), "vector_store")
 CHUNK_SIZE    = 500
 CHUNK_OVERLAP = 100
