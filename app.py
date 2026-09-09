@@ -4,6 +4,8 @@ import streamlit as st
 from groq import Groq
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+import pdfplumber
 
 
 # ── PAGE CONFIG ───────────────────────────────────────────────────────────────
@@ -17,25 +19,48 @@ st.title("🍎 Apple 10-K Intelligence")
 st.caption("Ask anything about Apple's FY2025 Annual Report — powered by RAG")
 
 
-# ── LOAD CHROMADB ─────────────────────────────────────────────────────────────
+# ── LOAD CHROMADB (auto-builds if not found) ──────────────────────────────────
 @st.cache_resource
 def load_store():
-    embeddings = HuggingFaceEmbeddings(
-        model_name="all-MiniLM-L6-v2",
-        model_kwargs={"device": "cpu"},
-        encode_kwargs={"normalize_embeddings": True}
-    )
-    chroma_path = os.path.join(os.path.dirname(__file__), "vector_store/chroma_db")
-    return Chroma(persist_directory=chroma_path, embedding_function=embeddings)
-
-store = load_store()
-
+    import tempfile
+    
+    chroma_path = "/tmp/chroma_db"
+    pdf_path = os.path.join(os.path.dirname(__file__), "10K.pdf")
+    
+    # Debug info
+    st.write(f"PDF exists: {os.path.exists(pdf_path)}")
+    st.write(f"ChromaDB exists: {os.path.exists(chroma_path)}")
+    
+    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    
+    if os.path.exists(chroma_path):
+        return Chroma(persist_directory=chroma_path, embedding_function=embeddings)
+    
+    # Build from PDF
+    if not os.path.exists(pdf_path):
+        st.error(f"PDF not found at: {pdf_path}")
+        return None
+        
+    with pdfplumber.open(pdf_path) as pdf:
+        pages = [{"text": p.extract_text() or "", "page": i+1} for i, p in enumerate(pdf.pages)]
+    
+    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
+    docs = []
+    for page in pages:
+        chunks = splitter.split_text(page["text"])
+        for chunk in chunks:
+            from langchain_core.documents import Document
+            docs.append(Document(page_content=chunk, metadata={"source": f"Page {page['page']}"}))
+    
+    store = Chroma.from_documents(docs, embeddings, persist_directory=chroma_path)
+    return store
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.header("⚙️ Settings")
-    groq_api_key = st.text_input("Groq API Key", type="password", help="Get free key at console.groq.com")
-
+    groq_api_key = os.environ.get("GROQ_API_KEY", "") or st.text_input("Groq API Key", type="password", help="Get free key at console.groq.com")
+    
+    
     st.markdown("---")
     st.subheader("📄 Data Source")
     st.success("Apple 10-K FY2025 — 80 pages, 776 chunks")

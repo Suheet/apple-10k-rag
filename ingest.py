@@ -9,7 +9,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 
 # ── CONFIGURATION ─────────────────────────────────────────────────────────────
-PDF_PATH      = os.path.join(os.path.dirname(__file__), "/Users/suheetsonawane/Desktop/India Vapsi/Github/Projects/Apple Sales RAG LLM/10K.pdf")
+PDF_PATH      = os.path.join(os.path.dirname(__file__), "10K.pdf")
 STORE_DIR     = os.path.join(os.path.dirname(__file__), "vector_store")
 CHUNK_SIZE    = 500
 CHUNK_OVERLAP = 100
@@ -65,7 +65,7 @@ def chunk_pages(pages: list[dict]) -> list[dict]:
     return chunks
 
 
-# ── PHASE 2B: VECTOR STORE (LOCAL TF-IDF) ─────────────────────────────────────
+# ── PHASE 2B: LOCAL VECTOR STORE (TF-IDF OFFLINE FALLBACK) ────────────────────
 class LocalVectorStore:
 
     def __init__(self):
@@ -101,7 +101,7 @@ class LocalVectorStore:
             return pickle.load(f)
 
 
-# ── MAC VERSION: HUGGINGFACE SEMANTIC EMBEDDINGS ───────────────────────────────
+# ── PHASE 2B: HUGGINGFACE SEMANTIC EMBEDDINGS (DEFAULT — USE THIS) ─────────────
 def build_huggingface_store(chunks: list[dict]):
     from langchain_huggingface import HuggingFaceEmbeddings
     from langchain_community.vectorstores import Chroma
@@ -126,7 +126,7 @@ def build_huggingface_store(chunks: list[dict]):
     return store
 
 
-# ── SANITY CHECK: TEST RETRIEVAL BEFORE BUILDING THE APP ──────────────────────
+# ── SANITY CHECK: TEST RETRIEVAL ───────────────────────────────────────────────
 def test_retrieval(store):
     print("🧪 Retrieval test:\n")
     queries = [
@@ -139,6 +139,7 @@ def test_retrieval(store):
         print(f"Q: {q}")
         results = store.similarity_search(q, k=2)
         for r in results:
+            # ChromaDB returns Document objects — access via .page_content and .metadata
             print(f"   [{r.metadata.get('source', '')}] {r.page_content[:180]}...")
         print()
 
@@ -151,15 +152,14 @@ if __name__ == "__main__":
 
     pages  = extract_text_from_pdf(PDF_PATH)
     chunks = chunk_pages(pages)
-    
-    
-    # LOCAL VERSION — works offline, no internet needed
+
+    # HUGGINGFACE VERSION — semantic embeddings (recommended)
+    store = build_huggingface_store(chunks)
+
+    # LOCAL TF-IDF VERSION — offline fallback (comment out above, uncomment below)
     # store = LocalVectorStore()
     # store.add_chunks(chunks)
     # store.save(STORE_DIR)
-
-    # MAC VERSION — uncomment for true semantic embeddings
-    store = build_huggingface_store(chunks)
 
     test_retrieval(store)
 
