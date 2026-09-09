@@ -55,6 +55,9 @@ def load_store():
     store = Chroma.from_documents(docs, embeddings, persist_directory=chroma_path)
     return store
 
+
+store = load_store()
+
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.header("⚙️ Settings")
